@@ -279,6 +279,7 @@
     { "path": "./packages/extensions/amazon-ops-bridge" },
     { "path": "./packages/extensions/scheduler" },
     { "path": "./packages/extensions/memory" },
+    { "path": "./packages/extensions/notify" },
     { "path": "./packages/hooks/hook-protocol" },
     { "path": "./packages/hooks/hooks-claude-code" },
     { "path": "./packages/hooks/hooks-codex" },

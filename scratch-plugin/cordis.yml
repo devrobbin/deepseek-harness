@@ -18,3 +18,8 @@
       name: '@deepseek-ai/dsh-memory'
       config:
         dataPath: '.dsh-memory.json'
+
+    - id: notify
+      name: '@deepseek-ai/dsh-notify'
+      config:
+        mock: true

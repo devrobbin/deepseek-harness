@@ -4026,6 +4026,15 @@ importers:
         specifier: workspace:^
         version: link:../../core/tools
 
+  packages/extensions/notify:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
+
   packages/extensions/scheduler:
     devDependencies:
       '@deepseek-ai/cordis':
