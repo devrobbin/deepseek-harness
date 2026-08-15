@@ -41,3 +41,6 @@ worktrees/
 
 # dsh-scheduler runtime data
 .dsh-scheduler-jobs.json
+
+# dsh-memory runtime data
+.dsh-memory.json

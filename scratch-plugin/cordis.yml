@@ -13,3 +13,8 @@
       config:
         dataPath: '.dsh-scheduler-jobs.json'
         scanIntervalSeconds: 60
+
+    - id: memory
+      name: '@deepseek-ai/dsh-memory'
+      config:
+        dataPath: '.dsh-memory.json'
