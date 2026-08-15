@@ -1,4 +1,4 @@
-# amazon_ops 桥插件加载配置（简洁包名引用）
+# DSH 插件版 DeerFlow 加载配置
 # 用法：pnpm dsh web --patch ./scratch-plugin/cordis.yml
 
 - insert:
@@ -7,3 +7,9 @@
       config:
         baseUrl: 'http://127.0.0.1:8001'
         mock: false
+
+    - id: scheduler
+      name: '@deepseek-ai/dsh-scheduler'
+      config:
+        dataPath: '.dsh-scheduler-jobs.json'
+        scanIntervalSeconds: 60

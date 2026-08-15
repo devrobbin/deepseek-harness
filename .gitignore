@@ -38,3 +38,6 @@ apps/web/dist/
 worktrees/
 .agents/worktrees/
 .typert-*/
+
+# dsh-scheduler runtime data
+.dsh-scheduler-jobs.json
