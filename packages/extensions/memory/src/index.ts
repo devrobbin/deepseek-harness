@@ -125,10 +125,18 @@ export function apply(ctx: Context, config: Config) {
           description: '一条记忆：content + createdAt',
         },
       },
-      render: (_args, value) => [{
-        type: 'text',
-        text: `主题共 ${(value as unknown[]).length} 条记忆。`,
-      }],
+      render: (args, value) => {
+        const entries = value as unknown as Array<{ content?: unknown; createdAt?: unknown }>
+        const preview = entries.map((e, i) => {
+          const text = typeof e.content === 'string' ? e.content.slice(0, 80) : ''
+          const at = typeof e.createdAt === 'string' ? e.createdAt : ''
+          return `${i + 1}. ${text}${at ? `（${at}）` : ''}`
+        }).join('\n')
+        return [{
+          type: 'text',
+          text: `主题「${args.topic}」共 ${entries.length} 条记忆${entries.length > 0 ? `：\n${preview}` : '。'}`,
+        }]
+      },
     },
     async execute(args) {
       const store = await loadStore(config.dataPath)
@@ -156,10 +164,19 @@ export function apply(ctx: Context, config: Config) {
           description: '匹配结果：topic + content + createdAt',
         },
       },
-      render: (_args, value) => [{
-        type: 'text',
-        text: `找到 ${(value as unknown[]).length} 条匹配记忆。`,
-      }],
+      render: (_args, value) => {
+        const items = value as unknown as Array<{ topic?: unknown; content?: unknown }>
+        const topics = [...new Set(items.map(i => (typeof i.topic === 'string' ? i.topic : '?')))]
+        const preview = items.slice(0, 5).map((i) => {
+          const t = typeof i.topic === 'string' ? i.topic : '?'
+          const c = typeof i.content === 'string' ? i.content.slice(0, 60) : ''
+          return `· [${t}] ${c}`
+        }).join('\n')
+        return [{
+          type: 'text',
+          text: `找到 ${items.length} 条匹配记忆，来自主题：${topics.join('、')}。${items.length > 0 ? `\n${preview}` : ''}`,
+        }]
+      },
     },
     async execute(args) {
       const store = await loadStore(config.dataPath)
@@ -193,10 +210,15 @@ export function apply(ctx: Context, config: Config) {
           description: '一个主题：topic + entryCount',
         },
       },
-      render: (_args, value) => [{
-        type: 'text',
-        text: `共 ${(value as unknown[]).length} 个记忆主题。`,
-      }],
+      render: (_args, value) => {
+        const items = value as unknown as Array<{ topic?: unknown; entryCount?: unknown }>
+        const parts = items.map(i =>
+          `${typeof i.topic === 'string' ? i.topic : '?'}（${typeof i.entryCount === 'number' ? i.entryCount : 0}条）`)
+        return [{
+          type: 'text',
+          text: `共 ${items.length} 个记忆主题${items.length > 0 ? `：${parts.join('、')}` : '。'}`,
+        }]
+      },
     },
     async execute() {
       const store = await loadStore(config.dataPath)
