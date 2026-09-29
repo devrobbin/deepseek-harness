@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-rbac",
   "description": "Role-based tool access control plugin: admin/operator/viewer policies enforced at tools/pre-execute",
-  "version": "0.1.0-rc.5",
+  "version": "0.1.0-rc.7",
   "publishConfig": {
     "access": "public"
   },

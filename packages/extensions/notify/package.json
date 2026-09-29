@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-notify",
   "description": "Notification gateway plugin: send alerts to Feishu/DingTalk/Telegram webhook robots, with mock mode for testing",
-  "version": "0.1.0-rc.5",
+  "version": "0.1.0-rc.7",
   "publishConfig": {
     "access": "public"
   },

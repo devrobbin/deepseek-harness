@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-scheduler",
   "description": "Global cron scheduler plugin: persistent 5-field cron jobs that inject task prompts into live agents",
-  "version": "0.1.0-rc.5",
+  "version": "0.1.0-rc.7",
   "publishConfig": {
     "access": "public"
   },
