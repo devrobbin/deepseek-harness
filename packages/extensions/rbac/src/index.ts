@@ -57,6 +57,10 @@ const ADMIN_ONLY = new Set([
   'cordis_define',
   'cordis_run',
   'cordis_undefine',
+  // deerflow-dsh arbitrary-execution tools (same class as bash/run_code)
+  'deerflow_run_bash',
+  'deerflow_run_python',
+  'deerflow_browser',
 ])
 
 /** The only tools a viewer may call. */
