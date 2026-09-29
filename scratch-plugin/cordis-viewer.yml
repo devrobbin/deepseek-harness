@@ -1,0 +1,9 @@
+# rbac viewer 角色验证用 patch（叠加在 cordis.yml 之上）
+# 用法：pnpm dsh --profile headless --patch ./scratch-plugin/cordis.yml --patch ./scratch-plugin/cordis-viewer.yml "..."
+# patch 语义：按 id 替换整行配置 → rbac 行被替换为 viewer 角色
+
+- id: rbac
+  name: '@deepseek-ai/dsh-rbac'
+  config:
+    role: viewer
+    deny: []

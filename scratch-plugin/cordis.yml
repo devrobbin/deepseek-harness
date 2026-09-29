@@ -23,3 +23,29 @@
       name: '@deepseek-ai/dsh-notify'
       config:
         mock: true
+
+    - id: rbac
+      name: '@deepseek-ai/dsh-rbac'
+      config:
+        role: admin
+        deny: []
+
+    - id: deerflow
+      name: 'deerflow-dsh'
+      config:
+        # DeerFlow 2.0 SuperAgent：Lead Agent 分解→skills 分发→收敛。
+        # LLM 走火山方舟 plan 兼容端点（ARK_API_KEY），搜索用豆包（同 key），
+        # 爬取用 local（免 key 直连 + 本地 HTML→Markdown，r.jina.ai 被墙不可用）。
+        leadModel: ark-code-latest
+        defaultMode: pro
+        maxSubAgents: 6
+        searchProvider: doubao
+        searchApiKey: ''
+        searchApiKeyEnv: ARK_API_KEY
+        crawlProvider: local
+        crawlApiKey: ''
+        crawlApiKeyEnv: JINA_API_KEY
+        pythonCommand: python
+        researchMaxSteps: 3
+        # research 子任务含多次 LLM 调用 + 真实搜索，默认 120s 会被中途杀掉。
+        middlewareTimeoutMs: 600000
