@@ -3945,6 +3945,15 @@ importers:
         specifier: workspace:^
         version: link:../../core/tools
 
+  packages/extensions/amazon-ops-skill:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-skill':
+        specifier: workspace:^
+        version: link:../../skill/skill
+
   packages/extensions/cordis-client-runner:
     devDependencies:
       '@deepseek-ai/cordis':

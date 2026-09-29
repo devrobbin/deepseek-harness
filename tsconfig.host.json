@@ -281,6 +281,7 @@
     { "path": "./packages/extensions/memory" },
     { "path": "./packages/extensions/notify" },
     { "path": "./packages/extensions/rbac" },
+    { "path": "./packages/extensions/amazon-ops-skill" },
     { "path": "./packages/hooks/hook-protocol" },
     { "path": "./packages/hooks/hooks-claude-code" },
     { "path": "./packages/hooks/hooks-codex" },

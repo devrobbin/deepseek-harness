@@ -1,5 +1,7 @@
-# DSH 插件版 DeerFlow 加载配置
+# DSH 插件版 DeerFlow 加载配置（本 fork 自研插件）
 # 用法：pnpm dsh web --patch ./scratch-plugin/cordis.yml
+# 注意：deerflow 由 deerflow-dsh bundle 提供（headless/web profile 的 packages），
+# 不要在这里再插 deerflow 行，否则 loader 报 duplicate entry id。
 
 - insert:
     - id: amazon-ops-bridge
@@ -30,22 +32,5 @@
         role: admin
         deny: []
 
-    - id: deerflow
-      name: 'deerflow-dsh'
-      config:
-        # DeerFlow 2.0 SuperAgent：Lead Agent 分解→skills 分发→收敛。
-        # LLM 走火山方舟 plan 兼容端点（ARK_API_KEY），搜索用豆包（同 key），
-        # 爬取用 local（免 key 直连 + 本地 HTML→Markdown，r.jina.ai 被墙不可用）。
-        leadModel: ark-code-latest
-        defaultMode: pro
-        maxSubAgents: 6
-        searchProvider: doubao
-        searchApiKey: ''
-        searchApiKeyEnv: ARK_API_KEY
-        crawlProvider: local
-        crawlApiKey: ''
-        crawlApiKeyEnv: JINA_API_KEY
-        pythonCommand: python
-        researchMaxSteps: 3
-        # research 子任务含多次 LLM 调用 + 真实搜索，默认 120s 会被中途杀掉。
-        middlewareTimeoutMs: 600000
+    - id: amazon-ops-skill
+      name: '@deepseek-ai/dsh-amazon-ops-skill'
