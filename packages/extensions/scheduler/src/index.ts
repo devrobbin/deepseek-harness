@@ -227,10 +227,29 @@ export function apply(ctx: Context, config: Config) {
           description: '一个定时任务',
         },
       },
-      render: (_args, value) => [{
-        type: 'text',
-        text: `共 ${(value as unknown[]).length} 个定时任务。`,
-      }],
+      render: (_args, value) => {
+        const jobs = value as unknown as Array<{
+          id?: unknown
+          name?: unknown
+          cron?: unknown
+          createdAt?: unknown
+          lastFiredAt?: unknown
+          lastResult?: unknown
+        }>
+        const lines = jobs.map((j, i) => {
+          const id = typeof j.id === 'string' ? j.id : '?'
+          const name = typeof j.name === 'string' ? j.name : '?'
+          const cron = typeof j.cron === 'string' ? j.cron : '?'
+          const head = `${i + 1}. 「${name}」 id=${id} cron="${cron}"`
+          const fired = typeof j.lastFiredAt === 'string' ? `上次触发 ${j.lastFiredAt}` : '尚未触发'
+          const result = typeof j.lastResult === 'string' ? `（${j.lastResult}）` : ''
+          return `${head}\n   ${fired}${result}`
+        })
+        return [{
+          type: 'text',
+          text: `共 ${jobs.length} 个定时任务${jobs.length > 0 ? `：\n${lines.join('\n')}` : '。'}\n删除任务需要上面列出的确切 id。`,
+        }]
+      },
     },
     async execute() {
       const jobs = await loadJobs()
