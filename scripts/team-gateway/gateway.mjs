@@ -171,10 +171,8 @@ function proxyUpgrade(req, socket, head, user) {
     upstream.write(lines.join('\r\n') + '\r\n\r\n')
     if (head.length > 0) upstream.write(head)
   })
-  upstream.on('data', (chunk) => {
-    // First chunk may carry the upstream upgrade response headers.
-    if (!socket.writableEnded) socket.write(chunk)
-  })
+  // Pure bidirectional piping: a manual data listener alongside pipe would
+  // duplicate every frame and corrupt the WebSocket protocol.
   upstream.pipe(socket)
   socket.pipe(upstream)
   socket.on('error', () => upstream.destroy())
