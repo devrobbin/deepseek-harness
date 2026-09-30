@@ -1,0 +1,11 @@
+# 默认会话组合：专属 memory 数据 + admin 角色（无专属模板的运营回退到这里）。
+- id: memory
+  name: '@deepseek-ai/dsh-memory'
+  config:
+    dataPath: '{{DATA_DIR}}/memory.json'
+
+- id: rbac
+  name: '@deepseek-ai/dsh-rbac'
+  config:
+    role: admin
+    deny: []

@@ -55,6 +55,26 @@ const template = readFileSync(join(here, 'team.cordis.template.yml'), 'utf8')
 const overlay = template.replaceAll('{{DATA_DIR}}', dataDir.replaceAll('\\', '/'))
 writeFileSync(overlayPath, overlay)
 
+// Install the operator's session preset ($DSH_HOME/.agent-presets/<name>):
+// per-user memory data + rbac role, shadowing the global rows for sessions
+// that pick this preset in the web UI. Falls back to presets/_default for
+// operators without a dedicated template.
+const presetSrc = existsSync(join(here, 'presets', name))
+  ? join(here, 'presets', name)
+  : join(here, 'presets', '_default')
+const presetDst = join(home, '.agent-presets', name)
+if (existsSync(presetSrc)) {
+  mkdirSync(presetDst, { recursive: true })
+  const agentSrc = readFileSync(join(presetSrc, 'agent.cordis.yml'), 'utf8')
+  writeFileSync(join(presetDst, 'agent.cordis.yml'), agentSrc.replaceAll('{{DATA_DIR}}', dataDir.replaceAll('\\', '/')))
+  const metaSrc = join(presetSrc, 'preset.yml')
+  if (existsSync(metaSrc)) {
+    const meta = readFileSync(metaSrc, 'utf8').replaceAll('{{NAME}}', name)
+    writeFileSync(join(presetDst, 'preset.yml'), meta)
+  }
+  console.log(`[start-operator] ${name}: 已安装会话预设（UI 预设选择器选"${name}"即启用个人记忆与角色）`)
+}
+
 // Pre-seed the repo workspace so the operator's first browser visit lands on
 // a ready picker: workspaces otherwise register only when the first session
 // is created, but creating one requires picking a workspace first.

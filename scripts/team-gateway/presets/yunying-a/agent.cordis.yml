@@ -1,0 +1,13 @@
+# 运营A 的会话组合：专属 memory 数据 + admin 角色。
+# preset 层工具遮蔽全局同名工具，加入本 preset 的会话读写 A 的数据文件。
+# 数据路径占位符由 start-operator 渲染为 users/yunying-a/data 的绝对路径。
+- id: memory
+  name: '@deepseek-ai/dsh-memory'
+  config:
+    dataPath: '{{DATA_DIR}}/memory.json'
+
+- id: rbac
+  name: '@deepseek-ai/dsh-rbac'
+  config:
+    role: admin
+    deny: []

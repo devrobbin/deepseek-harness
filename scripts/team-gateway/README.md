@@ -47,6 +47,17 @@ node scripts/team-gateway/gateway.mjs
 | `team.json` | **gitignored** — 团队配置（含密钥与口令哈希） |
 | `users/` | **gitignored** — 每用户的 home / 数据 / overlay |
 
+## 会话级身份（方案 B 机制：agent preset）
+
+除了"一人一实例"（方案 A），平台还支持**单实例多身份**：`start-operator` 会把该运营的**会话预设**安装到其 `DSH_HOME/.agent-presets/<name>`。运营在 Web UI 会话头的预设选择器（默认"标准模式"）选自己名字，该会话即获得：
+
+- **专属长期记忆**：preset 层的 `memory` 行遮蔽全局同名工具，读写指向该运营自己的 `memory.json`（实测：A 与 B 各写一条"隔离测试"，落盘互不可见，共享文件零污染）。
+- **专属权限角色**：preset 层的 `rbac` 行遮蔽全局角色（实测：运营B=operator 会话中 `cron_create` 被拒、`memory_write` 放行；运营A=admin 全开）。
+
+预设模板在 `presets/<name>/agent.cordis.yml`（`{{DATA_DIR}}` 按用户渲染）；新运营复制一个目录即可，无专属模板时回退 `presets/_default`。scheduler 保持全局（定时巡检是团队共享资产），会话日志本来就按会话隔离。
+
+方案 A 与 B 可叠加：一人一实例 + 实例内再按会话预设细分角色。
+
 ## 已知边界
 
 - 团队入口在服务器本机/局域网；对外暴露请自加 TLS（如 nginx 终结）。

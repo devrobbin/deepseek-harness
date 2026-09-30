@@ -1,0 +1,12 @@
+# 运营B 的会话组合：专属 memory 数据 + operator 角色（可诊断/写记忆/发通知，不可建定时任务/执行命令）。
+# 数据路径占位符由 start-operator 渲染为 users/yunying-b/data 的绝对路径。
+- id: memory
+  name: '@deepseek-ai/dsh-memory'
+  config:
+    dataPath: '{{DATA_DIR}}/memory.json'
+
+- id: rbac
+  name: '@deepseek-ai/dsh-rbac'
+  config:
+    role: operator
+    deny: []
