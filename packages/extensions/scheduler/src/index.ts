@@ -2,14 +2,14 @@
  * @module @deepseek-ai/dsh-scheduler
  *
  * Global cron scheduler plugin. Persists 5-field cron jobs in a JSON file
- * (survives restarts) and injects the job prompt into a live agent when the
+ * (survives restarts) and delivers the job prompt to a live agent when the
  * schedule fires. Unlike the session-scoped `dsh-schedule`, jobs here are
  * process-global and driven by a wall-clock scan loop.
  *
  * Delivery model: on fire, the scheduler finds a live root agent (or the
- * configured `targetAgentId`) and calls `agent.inject()` — the prompt lands
- * in the next admitted model request. If no live agent exists, the fire is
- * recorded as `missed` (agent.inject never wakes an idle agent).
+ * configured `targetAgentId`) and calls `agent.followup()` — which queues a
+ * follow-up turn AND wakes the driver, so an idle agent starts the scheduled
+ * work. If no live agent exists, the fire is recorded as `missed`.
  */
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
@@ -83,14 +83,14 @@ class JobStore {
 function pickTarget(
   ctx: Context,
   targetAgentId: string | undefined,
-): { id: string; inject: (msg: UserMessage) => void } | null {
+): { id: string; wake: (msg: UserMessage) => void } | null {
   const roots = ctx.agents.roots()
   const candidates = targetAgentId
     ? roots.filter(a => a.id === targetAgentId)
     : roots
   const target = candidates[0]
   if (!target) return null
-  return { id: target.id, inject: (msg) => { target.inject(msg) } }
+  return { id: target.id, wake: (msg) => { target.followup(msg) } }
 }
 
 export function apply(ctx: Context, config: Config) {
@@ -120,14 +120,14 @@ export function apply(ctx: Context, config: Config) {
       await persistJobs(jobs)
       return
     }
-    target.inject(createUserMessage({
+    target.wake(createUserMessage({
       content: [
         { type: 'text', text: `[scheduled job "${job.name}"] ${job.prompt}` },
       ],
       source: { kind: 'plugin', plugin: 'scheduler' },
     }))
     job.lastFiredAt = now
-    job.lastResult = `injected into ${target.id}`
+    job.lastResult = `followup delivered to ${target.id}`
     const jobs = await loadJobs()
     const idx = jobs.findIndex(j => j.id === job.id)
     if (idx >= 0) jobs[idx] = job
@@ -190,16 +190,21 @@ export function apply(ctx: Context, config: Config) {
         text: `定时任务已创建：${value.name}（id: ${value.id}，cron: ${value.cron}）`,
       }],
     },
-    async execute(args) {
+    async execute(args, exec) {
       // validate cron early so bad expressions fail the tool call
       parseCron(args.cron)
+      // Default the delivery target to the creating agent's own session, so a
+      // job made from a session wakes that session — not whichever root is
+      // first. An explicit targetAgentId overrides; with no calling agent (a
+      // non-session context) the roots()[0] fallback stays.
+      const target = args.targetAgentId ?? exec.agent?.id
       const job: CronJob = {
         id: allocateId(),
         name: args.name,
         cron: args.cron,
         prompt: args.prompt,
         createdAt: new Date().toISOString(),
-        ...(args.targetAgentId ? { targetAgentId: args.targetAgentId } : {}),
+        ...(target !== undefined ? { targetAgentId: target } : {}),
       }
       const jobs = await loadJobs()
       jobs.push(job)
