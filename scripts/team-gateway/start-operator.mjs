@@ -1,0 +1,101 @@
+/**
+ * start-operator — launch one operator's DSH web instance (方案 A).
+ *
+ * Usage:
+ *   node scripts/team-gateway/start-operator.mjs <operator-name>
+ *
+ * Reads scripts/team-gateway/team.json for the operator's port, then:
+ *   1. creates the operator's isolated DSH_HOME (users/<name>/home),
+ *   2. writes their credentials.yaml (copied from users/credentials.yaml if
+ *      present, else the team-shared one at users/<name>/home is left empty),
+ *   3. renders scripts/team-gateway/team.cordis.template.yml into a per-user
+ *      overlay with {{DATA_DIR}} pointing at users/<name>/data,
+ *   4. spawns `dsh web --port <port> --patch <overlay>` with DSH_HOME set.
+ *
+ * The gateway (gateway.mjs) must already be running to route to this port.
+ */
+
+import { spawn } from 'node:child_process'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { randomUUID } from 'node:crypto'
+
+const here = dirname(fileURLToPath(import.meta.url))
+const repoRoot = resolve(here, '..', '..')
+const name = process.argv[2]
+if (!name) {
+  console.error('用法: node scripts/team-gateway/start-operator.mjs <运营账号名>')
+  process.exit(1)
+}
+
+const team = JSON.parse(readFileSync(join(here, 'team.json'), 'utf8'))
+const user = team.users.find((u) => u.name === name)
+if (user === undefined) {
+  console.error(`team.json 里没有账号 "${name}"。已有: ${team.users.map((u) => u.name).join(', ')}`)
+  process.exit(1)
+}
+
+const home = join(here, 'users', name, 'home')
+const dataDir = join(here, 'users', name, 'data')
+const overlayPath = join(here, 'users', name, 'cordis.overlay.yml')
+mkdirSync(home, { recursive: true })
+mkdirSync(dataDir, { recursive: true })
+
+// Credentials: one-time copy from the team-shared template when absent.
+const homeCredentials = join(home, '.credentials.yaml')
+const sharedCredentials = join(here, 'users', 'credentials.yaml')
+if (!existsSync(homeCredentials) && existsSync(sharedCredentials)) {
+  copyFileSync(sharedCredentials, homeCredentials)
+  console.log(`[start-operator] 已为 ${name} 复制凭据模板`)
+}
+
+// Per-user overlay: shared plugin config with user-scoped data paths.
+const template = readFileSync(join(here, 'team.cordis.template.yml'), 'utf8')
+const overlay = template.replaceAll('{{DATA_DIR}}', dataDir.replaceAll('\\', '/'))
+writeFileSync(overlayPath, overlay)
+
+// Pre-seed the repo workspace so the operator's first browser visit lands on
+// a ready picker: workspaces otherwise register only when the first session
+// is created, but creating one requires picking a workspace first.
+const storagesDir = join(home, 'storages')
+const workspaceFile = join(storagesDir, 'workspace.json')
+if (!existsSync(workspaceFile)) {
+  const workspaceId = randomUUID()
+  const now = new Date().toISOString()
+  mkdirSync(storagesDir, { recursive: true })
+  writeFileSync(workspaceFile, JSON.stringify({
+    unit: { name: 'workspace', version: 2 },
+    global: { initialized: true, workspaceIds: [workspaceId], archivedSessionIds: [] },
+    tables: {
+      workspaces: {
+        [workspaceId]: {
+          path: repoRoot,
+          title: 'DeepSeekHarness',
+          sessionIds: [],
+          createdAt: now,
+          updatedAt: now,
+        },
+      },
+    },
+  }, null, 2) + '\n')
+  console.log(`[start-operator] ${name}: 已预置工作区 ${repoRoot}`)
+}
+
+console.log(`[start-operator] ${name}: home=${home}`)
+console.log(`[start-operator] ${name}: overlay=${overlayPath}`)
+console.log(`[start-operator] ${name}: 启动 dsh web :${user.port} ...`)
+
+const child = spawn('pnpm', [
+  'dsh', 'web',
+  // --patch must precede --port: the CLI's positional option parsing rejects
+  // --patch once --port <num> has shifted into its value mode.
+  '--patch', overlayPath,
+  '--port', String(user.port),
+], {
+  cwd: repoRoot,
+  env: { ...process.env, DSH_HOME: home },
+  stdio: 'inherit',
+  shell: true,
+})
+child.on('exit', (code) => process.exit(code ?? 0))

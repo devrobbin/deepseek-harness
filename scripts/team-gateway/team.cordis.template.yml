@@ -1,0 +1,37 @@
+# 团队部署：每运营人一个 DSH 实例（方案 A）
+#
+# 本模板由 scripts/team-gateway/start-operator.mjs 渲染成每用户的
+# overlay（替换 {{DATA_DIR}} 占位符后经 --patch 加载，优先级最高）。
+# memory / scheduler 的数据路径按用户隔离；其余字段为共享部署值。
+
+- insert:
+    - id: amazon-ops-bridge
+      name: '@deepseek-ai/dsh-amazon-ops-bridge'
+      config:
+        baseUrl: 'http://127.0.0.1:8001'
+        mock: false
+
+    - id: scheduler
+      name: '@deepseek-ai/dsh-scheduler'
+      config:
+        dataPath: '{{DATA_DIR}}/scheduler-jobs.json'
+        scanIntervalSeconds: 60
+
+    - id: memory
+      name: '@deepseek-ai/dsh-memory'
+      config:
+        dataPath: '{{DATA_DIR}}/memory.json'
+
+    - id: notify
+      name: '@deepseek-ai/dsh-notify'
+      config:
+        mock: true
+
+    - id: rbac
+      name: '@deepseek-ai/dsh-rbac'
+      config:
+        role: admin
+        deny: []
+
+    - id: amazon-ops-skill
+      name: '@deepseek-ai/dsh-amazon-ops-skill'

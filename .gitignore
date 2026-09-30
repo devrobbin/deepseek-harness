@@ -44,3 +44,7 @@ worktrees/
 
 # dsh-memory runtime data
 .dsh-memory.json
+
+# team gateway runtime state (方案 A 部署)
+scripts/team-gateway/team.json
+scripts/team-gateway/users/
