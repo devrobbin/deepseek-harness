@@ -119,11 +119,42 @@ function upstreamHeaders(req, user) {
   return headers
 }
 
+/** Identity banner injected into every HTML page: who am I + logout. */
+function bannerHtml(user) {
+  return `<div style="position:fixed;top:8px;right:12px;z-index:2147483647;display:flex;gap:8px;align-items:center;
+font:12px/1.4 system-ui,sans-serif;background:rgba(20,20,24,.85);border:1px solid rgba(255,255,255,.18);
+border-radius:999px;padding:4px 6px 4px 12px;color:#ddd;backdrop-filter:blur(6px)">
+<span>👤 ${user}</span>
+<a href="/__tg/logout" style="color:#fff;background:rgba(77,107,254,.75);border-radius:999px;padding:3px 10px;text-decoration:none">退出</a>
+</div>`
+}
+
 function proxyHttp(req, res, user) {
   const upstream = { host: '127.0.0.1', port: user.port, path: req.url, method: req.method, headers: upstreamHeaders(req, user) }
   const ureq = http.request(upstream, (ures) => {
-    res.writeHead(ures.statusCode ?? 502, ures.headers)
-    ures.pipe(res)
+    const isHtml = (ures.headers['content-type'] ?? '').includes('text/html')
+    if (!isHtml) {
+      res.writeHead(ures.statusCode ?? 502, ures.headers)
+      ures.pipe(res)
+      return
+    }
+    // Buffer the HTML and append the identity banner before </body>.
+    const chunks = []
+    ures.on('data', (c) => chunks.push(c))
+    ures.on('end', () => {
+      let html = Buffer.concat(chunks).toString('utf8')
+      const injected = html.includes('</body>')
+        ? html.replace('</body>', bannerHtml(user.name) + '</body>')
+        : html + bannerHtml(user.name)
+      const headers = { ...ures.headers }
+      // The buffered body gets an explicit length; the streamed framing must go.
+      delete headers['content-length']
+      delete headers['content-encoding']
+      delete headers['transfer-encoding']
+      headers['content-length'] = Buffer.byteLength(injected)
+      res.writeHead(ures.statusCode ?? 200, headers)
+      res.end(injected)
+    })
   })
   ureq.on('error', () => {
     res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' })
