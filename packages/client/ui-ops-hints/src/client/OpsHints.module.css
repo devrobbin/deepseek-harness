@@ -1,6 +1,13 @@
-/* Hint chip row above the composer card; tokens fall back gracefully. */
+/* Hint chip row above the composer card. Horizontal geometry mirrors the
+   official dock entries (QueueDock): subtract the shared side clearance and
+   center within the stack, so the row's left edge tracks the composer card
+   in both hero and active phases. */
 
 .row {
+  box-sizing: border-box;
+  width: calc(100% - 2 * var(--dsh-composer-side-clearance, 16px));
+  max-width: var(--dsh-composer-card-max-width, 780px);
+  margin: 0 auto;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
