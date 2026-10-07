@@ -182,6 +182,56 @@ function proxyUpgrade(req, socket, head, user) {
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost')
+  // Identity probe for the in-app dashboard: name + admin flag, no secrets.
+  if (url.pathname === '/__tg/whoami') {
+    const user = sessionUser(req)
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify(
+      user === null ? { name: null, admin: false } : { name: user.name, admin: user.admin === true },
+    ))
+    return
+  }
+  // Same-origin reverse proxy to the logged-in operator's amazon_ops:
+  // the browser dashboard calls /__tg/ops/* and the gateway injects the
+  // per-operator Bearer token — no secrets in the browser, no CORS.
+  if (url.pathname === '/__tg/ops' || url.pathname.startsWith('/__tg/ops/')) {
+    const user = sessionUser(req)
+    if (user === null) {
+      res.writeHead(401, { 'Content-Type': 'application/json' })
+      res.end('{"error":"unauthenticated"}')
+      return
+    }
+    if (user.opsPort === undefined) {
+      res.writeHead(502, { 'Content-Type': 'application/json' })
+      res.end('{"error":"operator has no ops instance"}')
+      return
+    }
+    // State-changing ops calls (the approval actions) are admin-only at the
+    // gateway itself — hiding buttons in the UI is not enforcement.
+    if (req.method !== 'GET' && user.admin !== true) {
+      res.writeHead(403, { 'Content-Type': 'application/json' })
+      res.end('{"error":"approval actions require an admin account"}')
+      return
+    }
+    const upstreamPath = url.pathname.slice('/__tg/ops'.length) + url.search
+    const ureq = http.request({
+      host: '127.0.0.1', port: user.opsPort, path: upstreamPath, method: req.method,
+      headers: {
+        Accept: 'application/json',
+        ...(req.method === 'POST' ? { 'Content-Type': 'application/json' } : {}),
+        Authorization: `Bearer ${user.opsToken ?? 'demo-token'}`,
+      },
+    }, (ures) => {
+      res.writeHead(ures.statusCode ?? 502, { 'Content-Type': 'application/json' })
+      ures.pipe(res)
+    })
+    ureq.on('error', () => {
+      res.writeHead(502, { 'Content-Type': 'application/json' })
+      res.end('{"error":"ops instance unreachable"}')
+    })
+    req.pipe(ureq)
+    return
+  }
   if (url.pathname === '/__tg/login' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
     res.end(loginPage(null))
