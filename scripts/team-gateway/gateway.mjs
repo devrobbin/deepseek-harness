@@ -30,9 +30,10 @@ import net from 'node:net'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { teamJsonPath } from './team-paths.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const configPath = process.argv[2] ?? join(here, 'team.json')
+const configPath = process.argv[2] ?? teamJsonPath
 const config = JSON.parse(readFileSync(configPath, 'utf8'))
 
 const GATEWAY_PORT = config.gatewayPort ?? 3090

@@ -19,6 +19,7 @@ import { spawn } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { teamJsonPath, operatorDir, usersDir } from './team-paths.mjs'
 import { randomUUID } from 'node:crypto'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -29,30 +30,36 @@ if (!name) {
   process.exit(1)
 }
 
-const team = JSON.parse(readFileSync(join(here, 'team.json'), 'utf8'))
+const team = JSON.parse(readFileSync(teamJsonPath, 'utf8'))
 const user = team.users.find((u) => u.name === name)
 if (user === undefined) {
   console.error(`team.json 里没有账号 "${name}"。已有: ${team.users.map((u) => u.name).join(', ')}`)
   process.exit(1)
 }
 
-const home = join(here, 'users', name, 'home')
-const dataDir = join(here, 'users', name, 'data')
-const overlayPath = join(here, 'users', name, 'cordis.overlay.yml')
+const opDir = operatorDir(name)
+const home = join(opDir, 'home')
+const dataDir = join(opDir, 'data')
+const overlayPath = join(opDir, 'cordis.overlay.yml')
 mkdirSync(home, { recursive: true })
 mkdirSync(dataDir, { recursive: true })
 
 // Credentials: one-time copy from the team-shared template when absent.
 const homeCredentials = join(home, '.credentials.yaml')
-const sharedCredentials = join(here, 'users', 'credentials.yaml')
+const sharedCredentials = join(usersDir, 'credentials.yaml')
 if (!existsSync(homeCredentials) && existsSync(sharedCredentials)) {
   copyFileSync(sharedCredentials, homeCredentials)
   console.log(`[start-operator] 已为 ${name} 复制凭据模板`)
 }
 
-// Per-user overlay: shared plugin config with user-scoped data paths.
+// Per-user overlay: shared plugin config with user-scoped data paths and
+// the operator's own amazon_ops endpoint (one ops instance per operator).
 const template = readFileSync(join(here, 'team.cordis.template.yml'), 'utf8')
-const overlay = template.replaceAll('{{DATA_DIR}}', dataDir.replaceAll('\\', '/'))
+const opsUrl = `http://127.0.0.1:${user.opsPort ?? 8001}`
+const overlay = template
+  .replaceAll('{{DATA_DIR}}', dataDir.replaceAll('\\', '/'))
+  .replaceAll('{{OPS_URL}}', opsUrl)
+  .replaceAll('{{OPS_TOKEN}}', user.opsToken ?? 'demo-token')
 writeFileSync(overlayPath, overlay)
 
 // Bind the operator's own preset as this instance's default (settings.yaml):

@@ -8,8 +8,10 @@
     - id: amazon-ops-bridge
       name: '@deepseek-ai/dsh-amazon-ops-bridge'
       config:
-        baseUrl: 'http://127.0.0.1:8001'
+        # 一人一套 amazon_ops：{{OPS_URL}} 由启动器按该运营的 opsPort 渲染
+        baseUrl: '{{OPS_URL}}'
         mock: false
+        apiToken: '{{OPS_TOKEN}}'
 
     - id: scheduler
       name: '@deepseek-ai/dsh-scheduler'

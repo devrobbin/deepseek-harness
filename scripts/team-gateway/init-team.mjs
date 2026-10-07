@@ -16,6 +16,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { teamJsonPath, usersDir } from './team-paths.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const pairs = process.argv.slice(2)
@@ -47,7 +48,6 @@ writeFileSync(join(here, 'team.json'), JSON.stringify(team, null, 2) + '\n')
 
 // Shared credential template: prefer the fork's .env key so operators can run models.
 const envPath = join(here, '..', '..', '.env')
-const usersDir = join(here, 'users')
 mkdirSync(usersDir, { recursive: true })
 const credPath = join(usersDir, 'credentials.yaml')
 if (!existsSync(credPath) && existsSync(envPath)) {
