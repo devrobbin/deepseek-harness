@@ -11,6 +11,7 @@ export type OpsHintsProps = PropsRuntime<'conversation.input.dock'>
 const HINTS: ReadonlyArray<{ readonly label: string; readonly prompt: string }> = [
   { label: '🔍 跑一遍巡检', prompt: '按 amazon-ops-inspection 技能跑一遍完整巡检闭环' },
   { label: '📊 分析 ACOS', prompt: '分析最近 30 天的 ACOS 诊断报告，给出优化建议' },
+  { label: '⭐ 口碑概览', prompt: '查看口碑概览：评论总数、平均评分和最近趋势，有差评激增或评分下滑就告诉我' },
   { label: '📝 生成日报', prompt: '生成昨天的运营日报：结合最近的 ACOS 诊断结果和长期记忆「ACOS分析」中的历史巡检记录，输出核心指标、变化趋势和今日待办' },
   { label: '📅 设每日巡检', prompt: '创建一个每天上午 10 点的定时巡检任务：按 amazon-ops-inspection 技能跑完整巡检闭环。如果已存在类似的每日巡检任务，告诉我它的名字和计划，不要重复创建' },
   { label: '⏰ 定时任务', prompt: '列出当前的定时任务' },

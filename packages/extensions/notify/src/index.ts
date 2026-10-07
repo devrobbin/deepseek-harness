@@ -39,11 +39,14 @@ export const Config: Schema<Config> = Schema.object({
 
 export type Channel = 'feishu' | 'dingtalk' | 'telegram'
 
-async function sendFeishu(webhook: string, text: string, timeoutMs: number): Promise<void> {
+async function sendFeishu(webhook: string, title: string | undefined, text: string, timeoutMs: number): Promise<void> {
+  const body = title === undefined
+    ? { msg_type: 'text', content: { text } }
+    : { msg_type: 'post', content: { post: { zh_cn: { title, content: [[{ tag: 'text', text }]] } } } }
   const res = await fetch(webhook, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ msg_type: 'text', content: { text } }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutMs),
   })
   if (!res.ok) {
@@ -51,11 +54,16 @@ async function sendFeishu(webhook: string, text: string, timeoutMs: number): Pro
   }
 }
 
-async function sendDingtalk(webhook: string, text: string, timeoutMs: number): Promise<void> {
+async function sendDingtalk(webhook: string, title: string | undefined, text: string, timeoutMs: number): Promise<void> {
+  const body = title === undefined
+    ? { msgtype: 'text', text: { content: text } }
+    : { msgtype: 'markdown', markdown: { title, text: `## ${title}
+
+${text}` } }
   const res = await fetch(webhook, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ msgtype: 'text', text: { content: text } }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutMs),
   })
   if (!res.ok) {
@@ -66,6 +74,7 @@ async function sendDingtalk(webhook: string, text: string, timeoutMs: number): P
 async function sendTelegram(
   token: string,
   chatId: string,
+  title: string | undefined,
   text: string,
   timeoutMs: number,
 ): Promise<void> {
@@ -73,7 +82,9 @@ async function sendTelegram(
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text }),
+    body: JSON.stringify({ chat_id: chatId, text, ...(title !== undefined ? { text: `*${title}*
+
+${text}`, parse_mode: 'Markdown' } : {}) }),
     signal: AbortSignal.timeout(timeoutMs),
   })
   if (!res.ok) {
@@ -96,6 +107,10 @@ export function apply(ctx: Context, config: Config) {
         type: 'string',
         required: true,
         description: '通知内容（纯文本或 Markdown）',
+      },
+      title: {
+        type: 'string',
+        description: '通知标题（可选；飞书显示为卡片标题，钉钉/Telegram 加粗在正文前）',
       },
     },
     output: {
@@ -126,17 +141,17 @@ export function apply(ctx: Context, config: Config) {
       switch (channel) {
         case 'feishu':
           if (!config.feishuWebhook) return { channel, sent: false, mode: 'live' }
-          await sendFeishu(config.feishuWebhook, text, 15_000)
+          await sendFeishu(config.feishuWebhook, args.title, text, 15_000)
           break
         case 'dingtalk':
           if (!config.dingtalkWebhook) return { channel, sent: false, mode: 'live' }
-          await sendDingtalk(config.dingtalkWebhook, text, 15_000)
+          await sendDingtalk(config.dingtalkWebhook, args.title, text, 15_000)
           break
         case 'telegram':
           if (!config.telegramToken || !config.telegramChatId) {
             return { channel, sent: false, mode: 'live' }
           }
-          await sendTelegram(config.telegramToken, config.telegramChatId, text, 15_000)
+          await sendTelegram(config.telegramToken, config.telegramChatId, args.title, text, 15_000)
           break
       }
       return { channel, sent: true, mode: 'live' }

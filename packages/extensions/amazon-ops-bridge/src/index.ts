@@ -22,11 +22,14 @@ export interface Config {
   baseUrl: string
   /** Serve canned responses instead of calling the service (for testing) */
   mock: boolean
+  /** Bearer token for state-changing amazon_ops endpoints (standalone deployments gate writes with it) */
+  apiToken: string
 }
 
 export const Config: Schema<Config> = Schema.object({
   baseUrl: Schema.string().default('http://127.0.0.1:8001'),
   mock: Schema.boolean().default(false),
+  apiToken: Schema.string().default('demo-token'),
 })
 
 /** Shape of a campaign diagnosis row returned by /ads/quantitative */
@@ -63,6 +66,30 @@ function num(v: unknown): number {
 /** 字符串字段安全读取（缺失回退 '?'），用于 render 摘要。 */
 function str(v: unknown): string {
   return typeof v === 'string' ? v : '?'
+}
+
+/** POST JSON 到 amazon_ops（带 Bearer 认证；写端点由独立部署的 token 门禁把关）。 */
+async function postJson(
+  baseUrl: string,
+  apiToken: string,
+  path: string,
+  body?: Record<string, JsonValue>,
+): Promise<Record<string, JsonValue>> {
+  const res = await fetch(`${baseUrl}${path}`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiToken}`,
+    },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    signal: AbortSignal.timeout(60_000),
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`amazon_ops ${res.status} on ${path}: ${text.slice(0, 300)}`)
+  }
+  return await res.json() as Record<string, JsonValue>
 }
 
 export function apply(ctx: Context, config: Config) {
@@ -294,6 +321,176 @@ export function apply(ctx: Context, config: Config) {
     },
     async execute() {
       return await getJson(config.baseUrl, '/api/amazon/listings/stats')
+    },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'approvals_list',
+    description: '列出运营建议（审批队列）：每条含 id、类型（调价/暂停/零订单处理）、严重度、目标活动、当前状态（draft→pending→approved→pending_confirmation→applied→rolled_back / rejected→failed）与说明。需要人工批准或拒绝时用 approvals_act。',
+    parameters: {
+      status: { type: 'string', description: '状态过滤：draft|pending|approved|pending_confirmation|applied|rolled_back|rejected|failed；缺省全部' },
+    },
+    output: {
+      schema: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: true,
+          description: '一条运营建议：id、type、severity、campaign_id、message、params、status、created_at',
+        },
+      },
+      render: (_args, value) => {
+        const items = value as Record<string, unknown>[]
+        const rows = items.map(r =>
+          `#${num(r.id)} [${str(r.status)}] ${str(r.type)}（${str(r.severity)}）｜${str(r.message).slice(0, 90)}`)
+        return [{
+          type: 'text',
+          text: `共 ${items.length} 条建议：\n${rows.join('\n')}`,
+        }]
+      },
+    },
+    async execute(args) {
+      const q = args.status ? `?status=${encodeURIComponent(args.status)}` : ''
+      const data = await getJson(config.baseUrl, `/api/amazon/recommendations${q}`)
+      return (data.recommendations ?? []) as Record<string, JsonValue>[]
+    },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'approvals_generate',
+    description: '从最近的 ACOS 定量诊断生成一批可审批的运营建议（如下调超支活动竞价、暂停零订单活动）。生成后进入 pending 状态等待人工批准，不会直接改动广告。',
+    parameters: {
+      days: { type: 'number', description: '诊断窗口天数，默认 30' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: true,
+        description: 'days、created、recommendation_ids、drafted',
+      },
+      render: (_args, value) => {
+        const v = value as Record<string, unknown>
+        const ids = (v.recommendation_ids ?? []) as unknown[]
+        return [{
+          type: 'text',
+          text: `已生成 ${num(v.created)} 条待审批建议（id: ${ids.join(', ')}），状态 pending，等待人工批准。`,
+        }]
+      },
+    },
+    async execute(args) {
+      return await postJson(config.baseUrl, config.apiToken,
+        `/api/amazon/ads/quantitative/recommend?days=${args.days ?? 30}`)
+    },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'approvals_act',
+    description: '对一条运营建议执行审批动作。状态机：approve（批准；低风险直接执行 applied，调价类转 pending_confirmation 等二次确认）→ confirm（二次确认后执行）→ rollback（回滚窗口内恢复原状）；reject（拒绝，附理由）。资金敏感操作，执行前必须向用户复述将改什么并获得确认。',
+    parameters: {
+      rec_id: { type: 'number', required: true, description: '建议 id（approvals_list 返回）' },
+      action: {
+        type: 'string',
+        required: true,
+        enum: ['approve', 'reject', 'confirm', 'rollback'],
+        description: 'approve=批准；confirm=二次确认执行（仅调价类）；rollback=回滚；reject=拒绝',
+      },
+      reason: { type: 'string', description: '拒绝理由（reject 时建议填写）' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: true,
+        description: 'ok、status',
+      },
+      render: (_args, value) => {
+        const v = value as Record<string, unknown>
+        const ok = v.ok === true
+        return [{
+          type: 'text',
+          text: ok
+            ? `操作成功，建议状态 → ${str(v.status) || '已处理'}。`
+            : `操作未生效（${str(v.status) || '状态不满足'}）。检查建议当前状态后重试。`,
+        }]
+      },
+    },
+    async execute(args) {
+      const body = args.reason ? { reason: args.reason } : undefined
+      return await postJson(config.baseUrl, config.apiToken,
+        `/api/amazon/recommendations/${args.rec_id}/${args.action}`, body)
+    },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'reviews_overview',
+    description: '查询口碑（评论）概览：评论总数、各状态/分类/紧急度分布、平均评分，以及近 N 天的按日趋势与分类汇总。用于差评激增监测与口碑体检。',
+    parameters: {
+      days: { type: 'number', description: '趋势窗口天数，7-90，默认 30' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          stats: {
+            type: 'object',
+            additionalProperties: true,
+            description: '总数、状态/分类/紧急度分布、平均评分',
+          },
+          trend: {
+            type: 'object',
+            additionalProperties: true,
+            description: '按日趋势与分类/紧急度汇总',
+          },
+        },
+      },
+      render: (args, value) => {
+        const stats = (value.stats ?? {}) as Record<string, unknown>
+        const trend = (value.trend ?? {}) as Record<string, unknown>
+        const byDate = (trend.by_date ?? []) as unknown[]
+        const avg = num(stats.avg_rating)
+        return [{
+          type: 'text',
+          text: `口碑概览：评论共 ${num(stats.total)} 条，平均评分 ${avg.toFixed(1)}；趋势窗口 ${args.days ?? 30} 天（by_date ${byDate.length} 天数据，分类/紧急度汇总见 JSON）。`,
+        }]
+      },
+    },
+    async execute(args) {
+      const days = args.days ?? 30
+      const [stats, trend] = await Promise.all([
+        getJson(config.baseUrl, '/api/amazon/reviews/stats'),
+        getJson(config.baseUrl, `/api/amazon/reviews/trend?days=${days}`),
+      ])
+      return { stats, trend }
+    },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'competitors_snapshot',
+    description: '查询竞品监控快照：竞品列表（价格/排名/评论数等追踪指标）、统计汇总与竞品告警。用于竞品价格与动态监测。',
+    parameters: {},
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: true,
+        description: 'competitors[]、stats、alerts',
+      },
+      render: (_args, value) => {
+        const v = value as Record<string, unknown>
+        const comps = (v.competitors ?? []) as Record<string, unknown>[]
+        const alerts = (v.alerts ?? []) as Record<string, unknown>[]
+        return [{
+          type: 'text',
+          text: `竞品 ${num(v.total)} 个，告警 ${alerts.length} 条。${comps.length > 0 ? `追踪中：${comps.slice(0, 5).map(c => str(c.name ?? c.competitor_id ?? c.asin)).join('、')}${comps.length > 5 ? ' 等' : ''}。` : ''}`,
+        }]
+      },
+    },
+    async execute() {
+      const [list, stats, alerts] = await Promise.all([
+        getJson(config.baseUrl, '/api/amazon/competitors'),
+        getJson(config.baseUrl, '/api/amazon/competitors/stats'),
+        getJson(config.baseUrl, '/api/amazon/competitors/alerts'),
+      ])
+      return { ...list, stats, alerts }
     },
   }))
 

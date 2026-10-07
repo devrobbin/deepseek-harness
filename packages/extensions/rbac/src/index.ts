@@ -61,6 +61,10 @@ const ADMIN_ONLY = new Set([
   'deerflow_run_bash',
   'deerflow_run_python',
   'deerflow_browser',
+  // amazon_ops approval machinery: fund-sensitive ad mutations (operator may
+  // list and read them; generating/approving/executing stays admin-only)
+  'approvals_generate',
+  'approvals_act',
 ])
 
 /** The only tools a viewer may call. */
@@ -72,6 +76,9 @@ const VIEWER_ALLOW = new Set([
   'memory_list',
   'cron_list',
   'ads_acos_quantitative',
+  'ops_overview',
+  'reviews_overview',
+  'competitors_snapshot',
   'ops_overview',
   'ops_orders',
   'ops_inventory',
