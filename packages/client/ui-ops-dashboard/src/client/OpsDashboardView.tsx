@@ -71,22 +71,29 @@ export function OpsDashboardView({ t }: OpsDashboardProps) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [trend, setTrend] = useState<Record<string, unknown>[]>([])
+  const [competitors, setCompetitors] = useState<Record<string, unknown>[]>([])
+  const [selected, setSelected] = useState<Set<number>>(new Set())
 
   const load = useCallback(async (): Promise<void> => {
     setLoading(true)
     setError(null)
     try {
-      const [ov, ac, rc, inv, who] = await Promise.all([
+      const [ov, ac, rc, inv, tr, co, who] = await Promise.all([
         getJson(`${OPS}/ops/overview`),
         getJson(`${OPS}/ads/quantitative?days=30`),
         getJson(`${OPS}/recommendations`),
         getJson(`${OPS}/ops/inventory`),
+        getJson(`${OPS}/reviews/trend?days=30`),
+        getJson(`${OPS}/competitors/alerts`),
         getJson('/__tg/whoami'),
       ])
       setOverview(ov)
       setAcos(ac)
       setRecs((rc.recommendations ?? []) as Record<string, unknown>[])
       setInventory((inv.inventory ?? []) as Record<string, unknown>[])
+      setTrend((tr.by_date ?? []) as Record<string, unknown>[])
+      setCompetitors((co.alerts ?? []) as Record<string, unknown>[])
       setAdmin(who.admin === true)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -110,6 +117,36 @@ export function OpsDashboardView({ t }: OpsDashboardProps) {
     } catch {
       setNotice(t('act.failed'))
     }
+    setBusy(null)
+  }
+
+  const toggleSelect = (id: number): void => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const batchApprove = async (): Promise<void> => {
+    const ids = [...selected]
+    if (ids.length === 0) return
+    setBusy('batch')
+    setNotice(null)
+    let okCount = 0
+    for (const id of ids) {
+      try {
+        const res = await fetch(`${OPS}/recommendations/${id}/approve`, { method: 'POST' })
+        const data = await res.json() as Record<string, unknown>
+        if (data.ok === true) okCount += 1
+      } catch {
+        /* per-row failure surfaces in the reloaded queue */
+      }
+    }
+    setNotice(`${t('act.done')} ${okCount}/${ids.length}`)
+    setSelected(new Set())
+    await load()
     setBusy(null)
   }
 
@@ -197,18 +234,90 @@ export function OpsDashboardView({ t }: OpsDashboardProps) {
       </section>
 
       <section className={css.section}>
+        <h3 className={css.sectionTitle}>{t('section.trend')}</h3>
+        {trend.length === 0 ? (
+          <span className={css.trendMeta}>{t('empty')}</span>
+        ) : (
+          <>
+            <div className={css.trendChart}>
+              {trend.map((d) => {
+                const h = Math.max(4, Math.min(100, num(d.count) * 8))
+                const hot = num(d.high_urgency) > 0
+                return (
+                  <div
+                    key={str(d.date)}
+                    className={hot ? `${css.trendBar} ${css.trendBarHot}` : css.trendBar}
+                    style={{ height: `${h}%` }}
+                    title={`${str(d.date)} · ${num(d.count)} ${t('trend.count')} · ${t('trend.avgRating')} ${num(d.avg_rating).toFixed(1)}`}
+                  />
+                )
+              })}
+            </div>
+            <div className={css.trendMeta}>
+              <span>{str(trend[0]?.date ?? '')} → {str(trend[trend.length - 1]?.date ?? '')}</span>
+              <span>{t('trend.count')}: {trend.reduce((sum, d) => sum + num(d.count), 0)}</span>
+              <span>{t('trend.avgRating')}: {(trend.reduce((sum, d) => sum + num(d.avg_rating) * num(d.count), 0) / Math.max(1, trend.reduce((sum, d) => sum + num(d.count), 0))).toFixed(2)}</span>
+            </div>
+          </>
+        )}
+      </section>
+
+      <section className={css.section}>
+        <h3 className={css.sectionTitle}>{t('section.competitors')}</h3>
+        {competitors.length === 0 ? (
+          <span className={css.trendMeta}>{t('empty')}</span>
+        ) : (
+          <table className={css.table}>
+            <thead>
+              <tr><th>ASIN</th><th>名称</th><th>{t('competitor.price7d')}</th><th>评分Δ30d</th><th>7天评论增长</th><th>{t('competitor.alert')}</th></tr>
+            </thead>
+            <tbody>
+              {competitors.map(a => (
+                <tr key={str(a.competitor_id)} className={css.alertRow}>
+                  <td>{str(a.asin)}</td>
+                  <td>{str(a.name)}</td>
+                  <td>{num(a.price_delta_7d).toFixed(1)}%</td>
+                  <td>{num(a.rating_delta_30d).toFixed(2)}</td>
+                  <td>{num(a.review_growth_7d).toFixed(1)}%</td>
+                  <td className={css.warn}>{str(a.type)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      <section className={css.section}>
         <h3 className={css.sectionTitle}>{t('section.approvals')}</h3>
+        {admin && selected.size > 0 && (
+          <div className={css.batchBar}>
+            <span>{selected.size} {t('batch.selected')}</span>
+            <button type="button" className={css.btn} disabled={busy !== null} onClick={() => { void batchApprove() }}>
+              {busy === 'batch' ? '…' : t('batch.approve')}
+            </button>
+          </div>
+        )}
         <table className={css.table}>
           <thead>
-            <tr><th>#</th><th>类型</th><th>严重度</th><th>状态</th><th>说明</th><th>操作</th></tr>
+            <tr><th></th><th>#</th><th>类型</th><th>严重度</th><th>状态</th><th>说明</th><th>操作</th></tr>
           </thead>
           <tbody>
             {recs.map((r) => {
               const acts = admin ? actionsFor(r.status) : []
               const rid = String(r.id)
+              const selectable = admin && (r.status === 'pending' || r.status === 'approved' || r.status === 'pending_confirmation')
               return (
                 <tr key={rid}>
-                  <td>{rid}</td>
+                  <td>
+                    {selectable && (
+                      <input
+                        type="checkbox"
+                        className={css.checkbox}
+                        checked={selected.has(num(r.id))}
+                        onChange={() => { toggleSelect(num(r.id)) }}
+                      />
+                    )}
+                  </td>
                   <td>{str(r.type)}</td>
                   <td>{str(r.severity)}</td>
                   <td>{str(r.status)}</td>

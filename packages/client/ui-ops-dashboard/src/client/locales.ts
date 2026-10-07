@@ -31,6 +31,14 @@ export type OpsDashboardKey =
   | 'act.done'
   | 'act.failed'
   | 'adminOnly'
+  | 'section.trend'
+  | 'trend.count'
+  | 'trend.avgRating'
+  | 'section.competitors'
+  | 'competitor.price7d'
+  | 'competitor.alert'
+  | 'batch.approve'
+  | 'batch.selected'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -66,6 +74,14 @@ const zh: Record<OpsDashboardKey, string> = {
   'act.done': '操作成功',
   'act.failed': '操作失败',
   adminOnly: '审批操作仅管理员账号可用',
+  'section.trend': '评论趋势',
+  'trend.count': '评论数',
+  'trend.avgRating': '平均评分',
+  'section.competitors': '竞品监控',
+  'competitor.price7d': '7天价格变动',
+  'competitor.alert': '告警',
+  'batch.approve': '批量批准',
+  'batch.selected': '已选',
 }
 
 const en: Record<OpsDashboardKey, string> = {
@@ -95,6 +111,14 @@ const en: Record<OpsDashboardKey, string> = {
   'act.done': 'Done',
   'act.failed': 'Failed',
   adminOnly: 'Approval actions require an admin account',
+  'section.trend': 'Review Trend',
+  'trend.count': 'Reviews',
+  'trend.avgRating': 'Avg Rating',
+  'section.competitors': 'Competitor Watch',
+  'competitor.price7d': '7d Price Δ',
+  'competitor.alert': 'Alert',
+  'batch.approve': 'Batch Approve',
+  'batch.selected': 'selected',
 }
 
 export { zh, en }
