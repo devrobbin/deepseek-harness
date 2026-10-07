@@ -33,5 +33,20 @@
         role: admin
         deny: []
 
-    - id: amazon-ops-skill
-      name: '@deepseek-ai/dsh-amazon-ops-skill'
+# 能力移除（越界读防线）：电商运营不需要编码 agent 的任意文件读写工具。
+# 没有能读任意路径的工具，就没有"A 会话读 B 的 memory.json / 密钥文件"。
+# 行 id 与 dsh-base 组合一致；--patch 的 id 级禁用最后生效。
+- id: tool-fs
+  disabled: true
+
+- id: tool-fs-search
+  disabled: true
+
+- id: tool-str-replace-editor
+  disabled: true
+
+- id: tool-pwsh
+  disabled: true
+
+- id: tool-bash
+  disabled: true

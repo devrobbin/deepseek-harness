@@ -55,6 +55,21 @@ const template = readFileSync(join(here, 'team.cordis.template.yml'), 'utf8')
 const overlay = template.replaceAll('{{DATA_DIR}}', dataDir.replaceAll('\\', '/'))
 writeFileSync(overlayPath, overlay)
 
+// Bind the operator's own preset as this instance's default (settings.yaml):
+// one instance per operator, so the default is per-person by construction —
+// a new session mounts the logged-in operator's preset with no manual pick.
+const settingsPath = join(home, 'settings.yaml')
+let settings = ''
+if (existsSync(settingsPath)) {
+  settings = readFileSync(settingsPath, 'utf8')
+}
+if (!/^agent-presets:/m.test(settings)) {
+  if (settings.length > 0 && !settings.endsWith('\n')) settings += '\n'
+  settings += `agent-presets:\n  default: ${name}\n`
+  writeFileSync(settingsPath, settings)
+  console.log(`[start-operator] ${name}: 默认预设已绑定为 ${name}`)
+}
+
 // Install the operator's session preset ($DSH_HOME/.agent-presets/<name>):
 // per-user memory data + rbac role, shadowing the global rows for sessions
 // that pick this preset in the web UI. Falls back to presets/_default for

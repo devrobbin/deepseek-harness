@@ -76,10 +76,8 @@ const VIEWER_ALLOW = new Set([
   'memory_list',
   'cron_list',
   'ads_acos_quantitative',
-  'ops_overview',
   'reviews_overview',
   'competitors_snapshot',
-  'ops_overview',
   'ops_orders',
   'ops_inventory',
   'ops_replenishment',
@@ -89,9 +87,8 @@ const VIEWER_ALLOW = new Set([
   'session_event_trace',
   'session_search',
   'session_trace',
-  'read',
-  'glob',
-  'grep',
+  // read/glob/grep intentionally absent: raw file access is not a viewer capability
+  // (defense-in-depth with the operator presets' tool-fs disable rows).
   'web_search',
   'web_fetch',
   'lsp',
