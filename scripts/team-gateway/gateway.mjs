@@ -158,6 +158,12 @@ function proxyHttp(req, res, user) {
     })
   })
   ureq.on('error', () => {
+    // Same guard as the ops proxy: an upstream reset after headers were sent
+    // must not re-writeHead (kills the process) — destroy the response instead.
+    if (res.headersSent) {
+      res.destroy()
+      return
+    }
     res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' })
     res.end(`上游实例 ${user.name} (127.0.0.1:${user.port}) 未启动，请通知管理员运行 start-operator`)
   })
@@ -226,6 +232,13 @@ const server = http.createServer((req, res) => {
       ures.pipe(res)
     })
     ureq.on('error', () => {
+      // Headers may already be streaming to the client (the upstream responded
+      // then the socket reset); writing again throws ERR_HTTP_HEADERS_SENT and
+      // an uncaught error kills the whole gateway. Only write if nothing sent.
+      if (res.headersSent) {
+        res.destroy()
+        return
+      }
       res.writeHead(502, { 'Content-Type': 'application/json' })
       res.end('{"error":"ops instance unreachable"}')
     })

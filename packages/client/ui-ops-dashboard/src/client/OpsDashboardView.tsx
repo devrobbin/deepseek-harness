@@ -207,6 +207,10 @@ export function OpsDashboardView({ t }: OpsDashboardProps) {
     .sort((a, b) => num(b.avoidable_spend) - num(a.avoidable_spend))
   const totalWaste = campaigns.reduce((s, c) => s + num(c.avoidable_spend), 0)
   const risky = inventory.filter(i => daysOf(i) < 14).slice(0, 8)
+  // 标红基线：高紧急度评论显著高于全期均值（1.5 倍）才标红，零星差评不触发
+  const huTotal = trend.reduce((sum, d) => sum + num(d.high_urgency), 0)
+  const huAvg = trend.length > 0 ? huTotal / trend.length : 0
+  const hotThreshold = Math.max(3, huAvg * 1.5)
   const pct = (v: unknown): string => (num(v) * 100).toFixed(1)
 
   if (loading && overview === null) {
@@ -294,7 +298,7 @@ export function OpsDashboardView({ t }: OpsDashboardProps) {
             <div className={css.trendChart}>
               {trend.map((d) => {
                 const h = Math.max(4, Math.min(100, num(d.count) * 8))
-                const hot = num(d.high_urgency) > 0
+                const hot = num(d.high_urgency) >= hotThreshold
                 return (
                   <div
                     key={str(d.date)}
