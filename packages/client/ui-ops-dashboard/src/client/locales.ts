@@ -39,6 +39,8 @@ export type OpsDashboardKey =
   | 'competitor.alert'
   | 'batch.approve'
   | 'batch.selected'
+  | 'export.report'
+  | 'export.done'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -82,6 +84,8 @@ const zh: Record<OpsDashboardKey, string> = {
   'competitor.alert': '告警',
   'batch.approve': '批量批准',
   'batch.selected': '已选',
+  'export.report': '导出日报',
+  'export.done': '日报已下载',
 }
 
 const en: Record<OpsDashboardKey, string> = {
@@ -119,6 +123,8 @@ const en: Record<OpsDashboardKey, string> = {
   'competitor.alert': 'Alert',
   'batch.approve': 'Batch Approve',
   'batch.selected': 'selected',
+  'export.report': 'Export Report',
+  'export.done': 'Report downloaded',
 }
 
 export { zh, en }

@@ -150,6 +150,57 @@ export function OpsDashboardView({ t }: OpsDashboardProps) {
     setBusy(null)
   }
 
+  const exportReport = (): void => {
+    const today = new Date().toISOString().slice(0, 10)
+    const lines: string[] = [
+      `# 运营日报 ${today}`,
+      '',
+      '## 一、经营总览',
+      `- 今日订单：${num(overview?.today_orders)}`,
+      `- 近30天 GMV：$${num(overview?.gmv_30d).toFixed(2)}`,
+      `- 待处理订单：${num(overview?.pending_orders)}`,
+      `- 库存总量：${num(overview?.total_inventory_units)} 件（在途 ${num(overview?.inbound_units)}）`,
+      `- 低库存 SKU：${num(overview?.low_stock_count)}`,
+      '',
+      '## 二、广告 ACOS 诊断',
+      `- 目标 ACOS：${pct(thresholds.target_acos)}% / 盈亏平衡：${pct(thresholds.breakeven_acos)}%`,
+      `- 可避免浪费合计：$${totalWaste.toFixed(2)}（${campaigns.filter(c => num(c.avoidable_spend) > 0).length}/${campaigns.length} 个活动）`,
+      '',
+      '| 活动 | 判定 | 浪费类型 | 可避免花费 |',
+      '|---|---|---|---|',
+      ...campaigns.slice(0, 10).map(c =>
+        `| ${str(c.campaign_name)} | ${str(c.verdict)} | ${str(c.waste_type)} | $${num(c.avoidable_spend).toFixed(2)} |`),
+      '',
+      '## 三、库存与补货风险（可售天数 <14）',
+      '',
+      '| ASIN | 名称 | 可售 | 日均 | 可售天数 |',
+      '|---|---|---|---|---|',
+      ...(risky.length > 0
+        ? risky.map(i => `| ${str(i.asin)} | ${str(i.name)} | ${num(i.fba_available)} | ${num(i.daily_sales_avg).toFixed(1)} | ${daysOf(i).toFixed(1)} |`)
+        : ['| （无） | | | | |']),
+      '',
+      '## 四、竞品告警',
+      '',
+      ...(competitors.length > 0
+        ? competitors.map(a => `- ${str(a.asin)} ${str(a.name)}：${str(a.type)}（7天价格 ${num(a.price_delta_7d).toFixed(1)}%，评论增长 ${num(a.review_growth_7d).toFixed(1)}%）`)
+        : ['- （无告警）']),
+      '',
+      '## 五、审批队列',
+      '',
+      ...(recs.length > 0
+        ? recs.map(r => `- #${num(r.id)} [${str(r.status)}] ${str(r.type)}（${str(r.severity)}）：${str(r.message).slice(0, 80)}`)
+        : ['- （队列为空）']),
+      '',
+    ]
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `${today}-运营日报.md`
+    a.click()
+    URL.revokeObjectURL(a.href)
+    setNotice(t('export.done'))
+  }
+
   const thresholds = (acos?.thresholds ?? {}) as Record<string, unknown>
   const campaigns = ((acos?.campaigns ?? []) as Record<string, unknown>[])
     .slice()
@@ -174,6 +225,7 @@ export function OpsDashboardView({ t }: OpsDashboardProps) {
     <div className={css.page}>
       <div className={css.toolbar}>
         <button type="button" className={css.btn} onClick={() => { void load() }}>{t('refresh')}</button>
+        <button type="button" className={css.btn} onClick={exportReport}>{t('export.report')}</button>
         {notice !== null && <span className={css.notice}>{notice}</span>}
         {!admin && <span className={css.hint}>{t('adminOnly')}</span>}
       </div>
